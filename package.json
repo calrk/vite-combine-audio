@@ -1,0 +1,24 @@
+{
+  "name": "vite-combine-audio",
+  "version": "1.0.0",
+  "description": "Combines audio files into a single file to be used as an audio sprite",
+  "main": "src/index.js",
+  "type": "module",
+  "exports": "./dist/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "vite",
+    "audio"
+  ],
+  "author": "Clark Lavery",
+  "license": "ISC",
+  "devDependencies": {
+    "child_process": "^1.0.2",
+    "ffmpeg-static": "^5.2.0",
+    "fs-extra": "^11.3.0",
+    "path": "^0.12.7",
+    "vite": "^6.3.2"
+  }
+}
