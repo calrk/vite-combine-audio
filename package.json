@@ -5,6 +5,7 @@
   "main": "src/index.js",
   "type": "module",
   "exports": "./dist/index.js",
+  "repository": "git@github.com:calrk/vite-combine-audio.git",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -19,6 +20,7 @@
     "ffmpeg-static": "^5.2.0",
     "fs-extra": "^11.3.0",
     "path": "^0.12.7",
-    "vite": "^6.3.2"
+    "vite": "^5.0.0"
   }
 }
+

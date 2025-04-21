@@ -1,4 +1,4 @@
-import { Plugin, ResolvedConfig } from 'vite';
+import { ResolvedConfig } from 'vite';
 import * as fs from 'fs-extra';
 import { createReadStream } from 'node:fs';
 import * as path from 'path';
@@ -14,7 +14,7 @@ type Options = {
   outputDir?: string; // Default output directory
 };
 
-export default function audioBuild(options: Options = {}): Plugin {
+export default function combineAudio(options: Options = {}) {
   let config: ResolvedConfig;
   // Store paths of all .mp3 files
   const audioFiles: string[] = [];
