@@ -1,10 +1,9 @@
 import { ResolvedConfig } from 'vite';
-import * as fs from 'fs-extra';
-import { createReadStream } from 'node:fs';
+import * as fse from 'fs-extra';
 import * as path from 'path';
 import { execSync } from 'child_process';
 import ffmpegPath from 'ffmpeg-static'; // Import the ffmpeg-static binary
-import { writeFileSync, existsSync } from 'node:fs';
+import { writeFileSync, existsSync, createReadStream } from 'node:fs';
 
 type Options = {
   fileRegex?: RegExp; // Regex to match audio files (default: /\.mp3$/)
@@ -41,7 +40,7 @@ export default function combineAudio(options: Options = {}) {
       outputDir = path.resolve(config.root, outputDir);
     },
 
-    async transform(src, id) {
+    async transform(src: string, id: string) {
       if (fileRegex.test(id)) {
 
         // Collect all valid files
@@ -53,7 +52,7 @@ export default function combineAudio(options: Options = {}) {
           filename: string,
           startTime: number,
           duration: number
-        };
+        } = {} as any; // Initialize dataItem with an empty object
 
         let outputs = [];
         if(outputTypes.includes('.mp3')){
@@ -128,8 +127,8 @@ export default function combineAudio(options: Options = {}) {
       if (audioFiles.length === 0) return;
 
       // Ensure the output directory exists
-      fs.ensureDirSync(outputDir);
-      fs.ensureDirSync(tempDir);
+      fse.ensureDirSync(outputDir);
+      fse.ensureDirSync(tempDir);
 
       // Create a temporary file listing all .mp3 files for ffmpeg
       const concatFilePath = path.join(tempDir, 'concat-list.txt');
@@ -168,7 +167,7 @@ export default function combineAudio(options: Options = {}) {
       }
 
       // Clean up the temporary concat file
-      fs.remove(concatFilePath);
+      fse.remove(concatFilePath);
     },
 
     writeBundle() {
@@ -176,19 +175,19 @@ export default function combineAudio(options: Options = {}) {
       if(outputTypes.includes('.mp3')){
         let mp3Path = path.join(tempDir, filename + '.mp3');
         let mp3OuputPath = path.join(outputDir, filename + '.mp3');
-        fs.move(mp3Path, mp3OuputPath);
+        fse.move(mp3Path, mp3OuputPath);
       }
 
       if (outputTypes.includes('.webm')){
         const webmPath = path.join(tempDir, filename+'.webm');
         const outputwebmPath = path.join(outputDir, filename+'.webm');
-        fs.move(webmPath, outputwebmPath);
+        fse.move(webmPath, outputwebmPath);
       }
     },
 
-    configureServer(server) {
+    configureServer(server: any) {
       // Serve the merged audio file during development
-      server.middlewares.use((req, res, next) => {
+      server.middlewares.use((req: any, res: any, next: any) => {
         let tempMp3Path = path.join(tempDir, filename+'.mp3');
         let tempWebmPath = path.join(tempDir, filename+'.webm');
 
