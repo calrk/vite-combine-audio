@@ -13,6 +13,21 @@ type Options = {
   outputDir?: string; // Default output directory
 };
 
+function debounce(func: Function, wait: number) {
+  let timeout: NodeJS.Timeout;
+  return function executedFunction(...args: any[]) {
+    //@ts-ignore
+    const context: any = this;
+    const later = () => {
+      //@ts-ignore
+      timeout = undefined;
+      func.apply(context, args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
+
 export default function combineAudio(options: Options = {}) {
   let config: ResolvedConfig;
   // Store paths of all .mp3 files
@@ -22,7 +37,9 @@ export default function combineAudio(options: Options = {}) {
   let filename = options.filename || 'merged-audio';
   // Default temporary and output directories
   let tempDir: string = options.tempDir || 'temp/audio';
-  let outputDir: string = options.outputDir || 'dist/audio';
+  let outputDir: string = options.outputDir || 'audio';
+  let tempBuildDir: string = options.tempDir || 'temp/audio';
+  let outputBuildDir: string = options.outputDir || 'dist/audio';
 
   // Cumulative current time for audio file starts
   let currentTime = 0;
@@ -30,21 +47,36 @@ export default function combineAudio(options: Options = {}) {
   const fileRegex = options.fileRegex || /\.mp3$/;
   const outputTypes = options.outputTypes || ['.mp3', '.webm']; // Default output types
 
-  return {
+  let lastAudioLength = 0; // Store the last length of audio files
+  let runBuild = debounce(() => {
+    if (lastAudioLength !== audioFiles.length && config.command === 'serve') {
+      lastAudioLength = audioFiles.length; // Update the last length of audio files
+      // Run the build process after a delay
+      plugin.buildEnd();
+    }
+  }, 500);
+
+  let plugin = {
     name: 'audio-build',
 
     configResolved(_config: ResolvedConfig) {
       config = _config;
+      // console.log('config:', config); // Log the resolved config for debugging
 
-      tempDir = path.resolve(config.root, tempDir);
-      outputDir = path.resolve(config.root, outputDir);
+      tempDir = (config.base + tempDir).replace(/\\/g, '/'); // Normalize path for Windows compatibility
+      outputDir = (config.base + outputDir).replace(/\\/g, '/'); // Normalize path for Windows compatibility
+
+      tempBuildDir = path.resolve(config.root, tempBuildDir); // Resolve the path for development server
+      outputBuildDir = path.resolve(config.root, outputBuildDir); // Resolve the path for development server
     },
 
     async transform(src: string, id: string) {
       if (fileRegex.test(id)) {
 
         // Collect all valid files
-        audioFiles.push(id);
+        if(!audioFiles.includes(id)){
+          audioFiles.push(id);
+        }
 
         let file = id;
         let dataItem: {
@@ -55,12 +87,23 @@ export default function combineAudio(options: Options = {}) {
         } = {} as any; // Initialize dataItem with an empty object
 
         let outputs = [];
-        if(outputTypes.includes('.mp3')){
-          outputs.push(path.join(tempDir, filename+'.mp3'));
+        if (config.command === 'build') {
+          if(outputTypes.includes('.webm')){
+            outputs.push(path.join(outputDir, filename+'.webm'));
+          }
+          if(outputTypes.includes('.mp3')){
+            outputs.push(path.join(outputDir, filename+'.mp3'));
+          }
         }
-        if(outputTypes.includes('.webm')){
-          outputs.push(path.join(tempDir, filename+'.webm'));
+        else{
+          if (outputTypes.includes('.webm')) {
+            outputs.push(path.join(tempDir, filename + '.webm'));
+          }
+          if (outputTypes.includes('.mp3')) {
+            outputs.push(path.join(tempDir, filename + '.mp3'));
+          }
         }
+
 
         // Generate metadata for each file
         try {
@@ -116,6 +159,8 @@ export default function combineAudio(options: Options = {}) {
           }
         }
 
+        runBuild(); // Call the debounced function
+
         return {
           code: `export default ${JSON.stringify(dataItem)};`,
           map: null,
@@ -124,14 +169,16 @@ export default function combineAudio(options: Options = {}) {
     },
 
     async buildEnd() {
+      console.log('Audio files:', audioFiles); // Log the collected audio files
+
       if (audioFiles.length === 0) return;
 
       // Ensure the output directory exists
-      fse.ensureDirSync(outputDir);
-      fse.ensureDirSync(tempDir);
+      fse.ensureDirSync(outputBuildDir);
+      fse.ensureDirSync(tempBuildDir);
 
       // Create a temporary file listing all .mp3 files for ffmpeg
-      const concatFilePath = path.join(tempDir, 'concat-list.txt');
+      const concatFilePath = path.join(tempBuildDir, 'concat-list.txt');
       const concatFileContent = audioFiles
         .map((file) => `file '${file.replace(/\\/g, '/')}'`) // Escape Windows paths
         .join('\n');
@@ -139,7 +186,7 @@ export default function combineAudio(options: Options = {}) {
 
       // Merge the .mp3 files using ffmpeg-static
       try {
-        let mp3Path = path.join(tempDir, filename+'.mp3');
+        let mp3Path = path.join(tempBuildDir, filename+'.mp3');
         execSync(
           `"${ffmpegPath}" -loglevel error -y -f concat -safe 0 -i "${concatFilePath}" -c copy "${mp3Path}"`,
           { stdio: 'inherit' }
@@ -151,9 +198,9 @@ export default function combineAudio(options: Options = {}) {
       }
 
       // Generate the .webm file
-      if (!outputTypes.includes('.webm')){
-        const webmPath = path.join(tempDir, filename+'.webm');
-        let mp3Path = path.join(tempDir, filename + '.mp3');
+      if (outputTypes.includes('.webm')){
+        const webmPath = path.join(tempBuildDir, filename+'.webm');
+        let mp3Path = path.join(tempBuildDir, filename + '.mp3');
         try {
           execSync(
             `"${ffmpegPath}" -loglevel error -y -i "${mp3Path}" -c:a libvorbis "${webmPath}"`,
@@ -173,14 +220,14 @@ export default function combineAudio(options: Options = {}) {
     writeBundle() {
       // Ensure the merged file is preserved in the dist folder
       if(outputTypes.includes('.mp3')){
-        let mp3Path = path.join(tempDir, filename + '.mp3');
-        let mp3OuputPath = path.join(outputDir, filename + '.mp3');
+        let mp3Path = path.join(tempBuildDir, filename + '.mp3');
+        let mp3OuputPath = path.join(outputBuildDir, filename + '.mp3');
         fse.move(mp3Path, mp3OuputPath);
       }
 
       if (outputTypes.includes('.webm')){
-        const webmPath = path.join(tempDir, filename+'.webm');
-        const outputwebmPath = path.join(outputDir, filename+'.webm');
+        const webmPath = path.join(tempBuildDir, filename+'.webm');
+        const outputwebmPath = path.join(outputBuildDir, filename+'.webm');
         fse.move(webmPath, outputwebmPath);
       }
     },
@@ -188,11 +235,12 @@ export default function combineAudio(options: Options = {}) {
     configureServer(server: any) {
       // Serve the merged audio file during development
       server.middlewares.use((req: any, res: any, next: any) => {
-        let tempMp3Path = path.join(tempDir, filename+'.mp3');
-        let tempWebmPath = path.join(tempDir, filename+'.webm');
+        let tempMp3Path = path.join(tempDir, filename + '.mp3').replace(/\\/g, '/');
+        let tempWebmPath = path.join(tempDir, filename + '.webm').replace(/\\/g, '/');
 
         if (req.url === tempMp3Path || req.url === tempWebmPath) {
-          const filePath = req.url.endsWith('.mp3') ? path.join(tempDir, filename+'.mp3') : path.join(tempDir, filename+'.webm');
+        // if (audioFiles.indexOf(req.url) !== -1) {
+          const filePath = path.join(config.root, req.url).replace(/\\/g, '/');
 
           if (existsSync(filePath)) {
             res.setHeader('Content-Type', req.url.endsWith('.mp3') ? 'audio/mpeg' : 'audio/webm');
@@ -209,4 +257,6 @@ export default function combineAudio(options: Options = {}) {
       });
     },
   };
+
+  return plugin;
 }

@@ -1,6 +1,6 @@
 {
   "name": "vite-combine-audio",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Combines audio files into a single file to be used as an audio sprite",
   "type": "module",
   "main": "dist/index.js",
@@ -17,7 +17,8 @@
   ],
   "repository": "git@github.com:calrk/vite-combine-audio.git",
   "scripts": {
-    "build": "rollup -c"
+    "build": "rollup -c",
+    "publish": "npm run build && npm publish --access public"
   },
   "keywords": [
     "vite",
