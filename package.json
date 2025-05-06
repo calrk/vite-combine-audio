@@ -1,6 +1,6 @@
 {
   "name": "vite-combine-audio",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Combines audio files into a single file to be used as an audio sprite",
   "type": "module",
   "main": "dist/index.js",

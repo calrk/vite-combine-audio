@@ -76,6 +76,3 @@ This tool was designed to be used with the [HowlerJS](https://howlerjs.com) libr
   playSound(soundClip2.filename);
 
 ```
-
-
-The audio sprites can be
